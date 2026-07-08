@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Centro Médico Fatima</title>
+    <style>
+        :root {
+            --bg-color: #e0eaf5; --glass-bg: rgba(255, 255, 255, 0.45);
+            --shadow-light: rgba(255, 255, 255, 0.9); --shadow-dark: rgba(0, 0, 0, 0.15);
+        }
+        body { background: var(--bg-color); color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; min-height: 100vh; }
+        
+        /* ALERTA OFFLINE */
+        #offline-alert {
+            display: none; position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
+            background: #f39c12; color: white; padding: 10px 20px; border-radius: 20px;
+            font-weight: bold; z-index: 9999; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            animation: parpadeo 2s infinite;
+        }
+        @keyframes parpadeo { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        .glass-3d { background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.8); border-left: 1px solid rgba(255,255,255,0.8); border-bottom: 1px solid rgba(255,255,255,0.2); border-right: 1px solid rgba(255,255,255,0.2); border-radius: 20px; box-shadow: 12px 12px 30px var(--shadow-dark), -12px -12px 30px var(--shadow-light); padding: 20px; transition: all 0.3s ease; }
+        .casilla { display: flex; flex-direction: column; justify-content: space-between; height: 210px; text-align: center; }
+        .casilla:hover { transform: translateY(-8px) scale(1.02); }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; margin-bottom: 10px; background: rgba(255,255,255,0.6); }
+        
+        /* SEPARADORES Y CUADRICULA */
+        .grid-hab { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 30px; padding: 0 40px 40px 40px; }
+        .separador-area { grid-column: 1 / -1; border-bottom: 2px solid #008B8B; padding-bottom: 5px; margin-top: 10px; }
+        .badge-hab { color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9em; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2); display: inline-block; }
+
+        .btn { background: var(--bg-color); color: #333; border: none; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px; box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light); transition: 0.2s; }
+        .btn:active { box-shadow: inset 4px 4px 10px var(--shadow-dark), inset -4px -4px 10px var(--shadow-light); }
+        .btn-action { background: #008B8B; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-stats { background: #8e44ad; color: white; margin-right: 5px; width: auto; }
+        .btn-edit-small { cursor: pointer; background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7; font-size: 11px; padding: 5px 10px; border-radius: 6px; font-weight: bold; transition: 0.2s; }
+        .btn-edit-small:hover { background: #f39c12; color: white; border-color: #f39c12; }
+
+        input, select { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: none; background: #f0f5fa; box-sizing: border-box; outline: none; box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); }
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { width: 90%; max-width: 850px; max-height: 90vh; overflow-y: auto; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        .caja-est { background: #f0f5fa; padding: 20px; border-radius: 15px; text-align: center; margin: 10px; flex: 1; box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); }
+        
+        @media print {
+            @page { margin: 1cm; }
+            body { background: white; margin: 0; padding: 0; }
+            body * { visibility: hidden; }
+            #area-impresion, #area-impresion * { visibility: visible; }
+            #area-impresion { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
+            .no-print { display: none !important; }
+            .glass-3d { box-shadow: none !important; border: none !important; background: white !important; padding: 0 !important; }
+            table { font-size: 10px !important; margin-top: 5px !important; }
+            th, td { padding: 3px !important; }
+            h2, h3, p { margin: 2px 0 !important; }
+            .membrete { border-bottom: 2px solid #008B8B; padding-bottom: 5px; margin-bottom: 10px; }
+            .membrete img { width: 90px !important; margin-right: 15px; }
+            .info-paciente { font-size: 11px; padding: 5px !important; background: none !important; border-bottom: 1px solid #eee; }
+        }
+        .membrete { display: flex; align-items: center; border-bottom: 3px solid #008B8B; padding-bottom: 15px; margin-bottom: 20px; }
+        .membrete img { width: 140px; margin-right: 20px; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <div id="offline-alert">⚠️ Sin conexión. Guardando de forma local...</div>
+
+    <datalist id="lista-medicamentos"></datalist>
+
+    <div id="pantalla-login" class="modal-overlay" style="display: flex;">
+        <div class="glass-3d" style="width: 350px; text-align: center;">
+            <img id="logo-login" src="" alt="Centro Médico Fatima" style="width: 150px; margin-bottom: 15px;">
+            <h2 style="color: #008B8B; margin:0; font-size:24px;">Centro Médico Fatima</h2>
+            <p style="margin-top:0; color:#555; font-size:14px;">Control hospitalario</p>
+            <input type="text" id="log-usr" placeholder="Usuario">
+            <input type="password" id="log-pass" placeholder="Contraseña">
+            <button class="btn btn-action" onclick="iniciarSesion()">Ingresar</button>
+        </div>
+    </div>
+
+    <div id="pantalla-principal" style="display: none;">
+        <header>
+            <div style="display: flex; align-items: center;">
+                <img id="logo-header" style="height: 55px; margin-right: 15px;" src="" alt="Logo">
+                <div>
+                    <h2 style="margin:0; color: #008B8B; font-size:24px;">Centro Médico Fatima</h2>
+                    <p style="margin:0; color: #555; font-size:14px;">Control hospitalario</p>
+                </div>
+            </div>
+            <div>
+                <span id="info-usr" style="margin-right: 15px; font-weight:bold;"></span>
+                <button class="btn btn-stats" id="btn-stats" onclick="abrirEstadisticas()">📊 Estadísticas</button>
+                <button class="btn" id="btn-admin-hab" style="width:auto; display:none; margin-right: 5px;" onclick="abrirModal('modal-gestion-hab')">⚙️ Áreas</button>
+                <button class="btn" id="btn-admin" style="width:auto; display:none;" onclick="abrirModal('modal-admin')">🔑 Claves</button>
+                <button class="btn btn-danger" style="width:auto;" onclick="location.reload()">Salir</button>
+            </div>
+        </header>
+
+        <div class="grid-hab" id="grid-habitaciones"></div>
+    </div>
+
+    <div id="modal-gestion-hab" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 400px;">
+            <h3 style="color: #008B8B;">⚙️ Administrar Áreas</h3>
+            <label>Nombre:</label> <input type="text" id="new-hab-nom">
+            <label>Tipo de Área:</label> 
+            <select id="new-hab-tipo">
+                <option value="Habitación">Habitación (Azul)</option>
+                <option value="Urgencias">Valoración / Urgencias (Rojo)</option>
+                <option value="Incubadora">Incubadora (Amarillo)</option>
+                <option value="Suite">Suite (Verde)</option>
+                <option value="Consultorio">Consultorio (Naranja)</option>
+            </select>
+            <button class="btn btn-action" onclick="crearHabitacion()">Añadir Área</button>
+            <button class="btn" onclick="cerrarModal('modal-gestion-hab')">Cerrar</button>
+        </div>
+    </div>
+
+    <div id="modal-estadisticas" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 850px;">
+            <h3 style="color: #8e44ad; text-align: center; font-size: 24px;">📊 Estadísticas de Ocupación Anual</h3>
+            <p style="text-align: center; color: #666; font-size: 12px;">* Se calcula midiendo el número de días que han estado ocupadas las camas respecto a los días que lleva el año. Aplica regla de 1 día extra si superan las 6 horas de estancia.</p>
+            
+            <div style="display: flex; justify-content: space-between; margin-top: 20px; flex-wrap: wrap; gap:10px;">
+                <div class="caja-est"><h1 style="color: #2980b9; margin: 0; font-size: 40px;" id="stat-pct">0%</h1><p style="margin: 5px 0 0 0; font-weight: bold; color: #555;">Tasa de Ocupación</p></div>
+                <div class="caja-est"><h1 style="color: #e67e22; margin: 0; font-size: 40px;" id="stat-dias">0</h1><p style="margin: 5px 0 0 0; font-weight: bold; color: #555;">Días Cama Usados</p></div>
+                <div class="caja-est"><h1 style="color: #27ae60; margin: 0; font-size: 40px;" id="stat-ingresos">0</h1><p style="margin: 5px 0 0 0; font-weight: bold; color: #555;">Ingresos Totales</p></div>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #ccc; margin: 20px 0;">
+            <h4 style="color: #008B8B; margin-bottom: 5px;">📝 Historial Clínico de Ingresos</h4>
+            <div style="max-height: 250px; overflow-y: auto; background: rgba(255,255,255,0.5); border-radius: 10px; padding: 10px;">
+                <table style="font-size: 12px; margin-top: 0;">
+                    <thead>
+                        <tr><th>Estado</th><th>Paciente (Edad)</th><th>Médico</th><th>Fecha Ingreso</th><th>Estancia Exacta</th><th>Cálculo Gráficas</th></tr>
+                    </thead>
+                    <tbody id="tabla-historial"></tbody>
+                </table>
+            </div>
+            <button class="btn" onclick="cerrarModal('modal-estadisticas')" style="margin-top: 20px;">Cerrar</button>
+        </div>
+    </div>
+
+    <div id="modal-ingreso" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 400px;">
+            <h3 style="color: #008B8B;">Ingresar Paciente</h3>
+            <p>Área: <strong id="lbl-hab"></strong></p>
+            <label>Nombre del Paciente:</label>
+            <input type="text" id="nuevo-paciente" oninput="capitalizarPrimeraLetra(this)">
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label>Edad:</label><input type="text" id="nueva-edad" placeholder="Ej. 35 años"></div>
+                <div style="flex: 2;"><label>Médico Tratante:</label><input type="text" id="nuevo-medico" placeholder="Ej. Dr. García" oninput="capitalizarPrimeraLetra(this)"></div>
+            </div>
+            <label>Fecha y Hora (Opcional - por si llegó antes):</label>
+            <input type="datetime-local" id="nueva-fecha" title="Si lo dejas vacío, se registrará el momento actual">
+            <button class="btn btn-action" onclick="guardarPaciente()">Guardar y Ocupar</button>
+            <button class="btn" onclick="cerrarModal('modal-ingreso')">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="modal-expediente" class="modal-overlay">
+        <div class="glass-3d modal-content" id="area-impresion">
+            <div class="membrete">
+                <img id="logo-impresion" src="" alt="Centro Médico Fatima">
+                <div><h2 style="margin: 0; color: #008B8B; font-size:22px;">Centro Médico Fatima</h2><p style="margin: 2px 0 0 0; color:#555;">Reporte de Consumo de Medicamentos</p></div>
+            </div>
+            <div class="info-paciente" style="display: flex; justify-content: space-between; flex-wrap: wrap; background: #f0f5fa; padding: 15px; border-radius: 10px; gap: 10px;">
+                <div><strong>Paciente:</strong> <span id="exp-nombre"></span> <span id="exp-edad" style="color: #666; font-size: 0.9em;"></span></div>
+                <div><strong>Médico:</strong> <span id="exp-medico" style="color: #008B8B; font-weight: bold;"></span></div>
+                <div><strong>Ingreso:</strong> <span id="exp-fecha"></span></div>
+                <div><strong>Egreso:</strong> <span id="exp-egreso">Pendiente</span></div>
+            </div>
+            <div id="zona-farmacia" class="no-print" style="margin-top: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="med-nom" placeholder="Medicamento..." list="lista-medicamentos" oninput="capitalizarPrimeraLetra(this)" style="flex: 2; margin-bottom: 0;">
+                <select id="med-pres" style="flex: 1; margin-bottom: 0;">
+                    <option value="Tableta">Tableta</option><option value="Ampula">Ámpula</option>
+                    <option value="Frasco">Frasco</option><option value="Capsula">Cápsula</option>
+                    <option value="Supositorio">Supositorio</option><option value="Otro">Otro</option>
+                </select>
+                <input type="number" id="med-cant" placeholder="Cant." style="width: 70px; margin-bottom: 0;">
+                <input type="number" id="med-precio" placeholder="Costo $" style="width: 90px; margin-bottom: 0;">
+                <button class="btn btn-action" style="width: 100px; margin-top: 0;" onclick="agregarMed()">+ Añadir</button>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Cant</th><th>Medicamento</th><th>Presentación</th><th class="solo-admin">Auditoría</th><th>Precio B.</th><th>+40%</th><th>Total</th><th class="no-print"></th></tr>
+                </thead>
+                <tbody id="tabla-meds"></tbody>
+            </table>
+            <h3 style="text-align: right; color: #008B8B;">Gran Total: $<span id="exp-total">0.00</span></h3>
+            <div class="no-print" style="margin-top: 20px; display: flex; gap: 15px;">
+                <button class="btn" onclick="window.print()">🖨️ Imprimir Hoja</button>
+                <button class="btn" onclick="cerrarModal('modal-expediente')" style="background: #ccc;">Cerrar Vista</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-edicion" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 400px;">
+            <h3 style="color: #008B8B;">Modificar Registro</h3>
+            <p><strong>Medicamento:</strong> <span id="edit-nom"></span></p>
+            <input type="hidden" id="edit-id">
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label>Nueva Cantidad:</label><input type="number" id="edit-cant"></div>
+                <div style="flex: 1;"><label>Nuevo Precio Base:</label><input type="number" id="edit-precio"></div>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+            <label style="color: #e74c3c; font-weight: bold;">🔑 NIP de Autorización Directiva:</label>
+            <input type="password" id="edit-pin" placeholder="Ej. 1234">
+            <button class="btn btn-action" onclick="guardarEdicion()">Autorizar y Guardar</button>
+            <button class="btn" onclick="cerrarModal('modal-edicion')">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="modal-alta" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 400px; text-align: center;">
+            <h3 style="color: #e74c3c;">Dar de Alta</h3>
+            <p>¿Deseas imprimir el reporte antes de liberar el área?</p>
+            <button class="btn btn-action" onclick="imprimirYAlta()">Imprimir y Dar de Alta</button>
+            <button class="btn" onclick="soloAlta()">Solo Dar de Alta</button>
+            <button class="btn" onclick="cerrarModal('modal-alta')">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="modal-admin" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 400px;">
+            <h3 style="color: #008B8B;">🔑 Gestionar Accesos</h3>
+            <label>Cambiar Contraseña de Usuarios:</label> 
+            <select id="sel-usr"><option value="admin">Administrador</option><option value="farmacia">Farmacia</option><option value="recepcion">Recepción</option></select>
+            <input type="text" id="new-pass" placeholder="Nueva clave">
+            <button class="btn btn-action" onclick="cambiarPassword()" style="margin-bottom: 20px;">Actualizar Contraseña</button>
+            <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+            <label style="color: #e74c3c; font-weight: bold;">Configurar NIP de Autorización:</label>
+            <input type="text" id="new-pin-maestro" placeholder="Ej. 1234">
+            <button class="btn btn-action" onclick="cambiarPinMaestro()" style="background: #e74c3c;">Guardar Nuevo NIP</button>
+            <button class="btn" onclick="cerrarModal('modal-admin')" style="margin-top: 20px;">Cerrar Panel</button>
+        </div>
+    </div>
+
+    <div id="modal-edit-paciente" class="modal-overlay">
+        <div class="glass-3d modal-content" style="max-width: 400px;">
+            <h3 style="color: #008B8B;">✏️ Editar Datos del Paciente</h3>
+            <input type="hidden" id="edit-pac-id">
+            <label>Nombre:</label> <input type="text" id="edit-pac-nom" oninput="capitalizarPrimeraLetra(this)">
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label>Edad:</label><input type="text" id="edit-pac-edad"></div>
+                <div style="flex: 2;"><label>Médico:</label><input type="text" id="edit-pac-medico" oninput="capitalizarPrimeraLetra(this)"></div>
+            </div>
+            <label>Fecha de Ingreso Real:</label> <input type="datetime-local" id="edit-pac-fecha">
+            <button class="btn btn-action" onclick="guardarEdicionPaciente()">Guardar Cambios</button>
+            <button class="btn" onclick="cerrarModal('modal-edit-paciente')">Cancelar</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // AUTO-DETECCIÓN DE IP PARA CELULARES Y PCs
+        // ==========================================
+        let API = window.location.origin;
+
+        let usrActual = "", rolActual = "";
+        let habActiva = "", pacActivoId = null;
+
+        const COLORES = { "Habitación": "#2980b9", "Urgencias": "#e74c3c", "Incubadora": "#f1c40f", "Suite": "#27ae60", "Consultorio": "#e67e22" };
+        const TITULOS = { "Habitación": "🛏️ Habitaciones Hospitalarias", "Urgencias": "🚨 Valoración y Urgencias", "Incubadora": "🐣 Incubadoras", "Suite": "🌟 Suites", "Consultorio": "🩺 Consultorios" };
+
+        document.getElementById('logo-header').src = `${API}/logo`;
+        document.getElementById('logo-impresion').src = `${API}/logo`;
+        document.getElementById('logo-login').src = `${API}/logo`;
+
+        function capitalizarPrimeraLetra(input) { if(input.value.length > 0) input.value = input.value.charAt(0).toUpperCase() + input.value.slice(1); }
+
+        // ==========================================
+        // SISTEMA OFFLINE-FIRST (PARA CAÍDAS DE RED)
+        // ==========================================
+        let colaOffline = JSON.parse(localStorage.getItem('colaFatima')) || [];
+
+        function actualizarUIOffline() {
+            const alerta = document.getElementById('offline-alert');
+            if(colaOffline.length > 0) {
+                alerta.style.display = 'block';
+                alerta.innerText = `⚠️ Sin conexión. ${colaOffline.length} registros guardados en esta PC esperando red.`;
+            } else { alerta.style.display = 'none'; }
+        }
+
+        async function peticionSegura(url, datos) {
+            try {
+                let res = await fetch(`${API}${url}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(datos) });
+                if(!res.ok) throw new Error("Fallo");
+                return true; 
+            } catch(e) {
+                colaOffline.push({url: url, datos: datos});
+                localStorage.setItem('colaFatima', JSON.stringify(colaOffline));
+                actualizarUIOffline();
+                return false; 
+            }
+        }
+
+        async function intentarSincronizar() {
+            if(colaOffline.length === 0) return;
+            let tempCola = [...colaOffline];
+            colaOffline = [];
+            let exitoTotal = true;
+
+            for(let item of tempCola) {
+                try {
+                    let res = await fetch(`${API}${item.url}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(item.datos) });
+                    if(!res.ok) throw new Error("Fallo");
+                } catch(e) {
+                    colaOffline.push(item);
+                    exitoTotal = false;
+                }
+            }
+            localStorage.setItem('colaFatima', JSON.stringify(colaOffline));
+            actualizarUIOffline();
+
+            if(exitoTotal && tempCola.length > 0) {
+                cargarHabitaciones();
+                if(document.getElementById('modal-expediente').style.display === 'flex') {
+                    abrirExpediente(pacActivoId, habActiva); 
+                }
+            }
+        }
+        actualizarUIOffline();
+
+        // ==========================================
+        // FUNCIONES NORMALES DEL HOSPITAL
+        // ==========================================
+        async function iniciarSesion() {
+            const u = document.getElementById('log-usr').value, p = document.getElementById('log-pass').value;
+            try {
+                const res = await fetch(`${API}/login`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({usuario:u, password:p}) });
+                if(res.ok) {
+                    const data = await res.json(); usrActual = data.usuario; rolActual = data.rol;
+                    document.getElementById('pantalla-login').style.display = 'none';
+                    document.getElementById('pantalla-principal').style.display = 'block';
+                    document.getElementById('info-usr').innerText = `${usrActual.toUpperCase()} (${rolActual.toUpperCase()})`;
+                    if(rolActual === 'administrador') { document.getElementById('btn-admin').style.display = 'inline-block'; document.getElementById('btn-admin-hab').style.display = 'inline-block'; }
+                    cargarHabitaciones(); cargarCatalogo();
+                } else alert("Datos incorrectos");
+            } catch(e) { alert("Error de red. Asegúrate de que el servidor esté encendido."); }
+        }
+
+        async function abrirEstadisticas() {
+            const res = await fetch(`${API}/estadisticas`); const data = await res.json();
+            document.getElementById('stat-pct').innerText = `${data.porcentaje}%`;
+            document.getElementById('stat-dias').innerText = `${data.dias_consumidos}`;
+            document.getElementById('stat-ingresos').innerText = data.ingresos_anuales;
+            
+            const tbody = document.getElementById('tabla-historial');
+            tbody.innerHTML = "";
+            data.historial.forEach(p => {
+                let badge = p.estado === 'Alta' ? '<span style="background:#27ae60; color:white; padding:2px 5px; border-radius:5px;">Alta</span>' : '<span style="background:#e74c3c; color:white; padding:2px 5px; border-radius:5px;">Internado</span>';
+                tbody.innerHTML += `<tr><td>${badge}</td><td><strong>${p.nombre}</strong> <span style="color:#666;">(${p.edad})</span></td><td>${p.medico}</td><td>${p.ingreso}</td><td>${p.tiempo}</td><td><strong>${p.dias_fact} días</strong></td></tr>`;
+            });
+            abrirModal('modal-estadisticas');
+        }
+
+        async function cargarHabitaciones() {
+            try {
+                const res = await fetch(`${API}/habitaciones`); const habs = await res.json();
+                const grid = document.getElementById('grid-habitaciones'); grid.innerHTML = "";
+                
+                let agrupadas = {};
+                habs.forEach(h => { if(!agrupadas[h.tipo]) agrupadas[h.tipo] = []; agrupadas[h.tipo].push(h); });
+
+                for (const tipo in agrupadas) {
+                    let tituloSeccion = TITULOS[tipo] || tipo;
+                    grid.innerHTML += `<div class="separador-area"><h2 style="color: #008B8B; margin: 0; font-size: 22px;">${tituloSeccion}</h2></div>`;
+                    
+                    agrupadas[tipo].forEach(h => {
+                        let colorBase = COLORES[h.tipo] || "#888";
+                        let glowStyle = h.estado === 'OCUPADA' ? `box-shadow: 0 0 25px ${colorBase}80; border: 1px solid ${colorBase};` : '';
+                        
+                        let html = `<div class="glass-3d casilla" style="${glowStyle}">
+                                        <div><div class="badge-hab" style="background-color: ${colorBase};">${h.numero}</div></div>`;
+                        
+                        if(h.estado === 'LIBRE') {
+                            html += `<h3 style="color: #888;">Disponible</h3><div>`;
+                            
+                            // RESTRICCIÓN DE FARMACIA
+                            if(rolActual !== 'farmacia') {
+                                html += `<button class="btn btn-action" onclick="prepararIngreso('${h.numero}')">+ Agregar Paciente</button>`;
+                            }
+                            
+                            if(rolActual === 'administrador') {
+                                html += `<button class="btn btn-danger" style="margin-top:5px; font-size:12px; padding:5px;" onclick="eliminarHabitacion('${h.numero}')">X Eliminar Área</button>`;
+                            }
+                            html += `</div>`;
+                        } else {
+                            let divEdad = h.edad ? `<span style="font-size:0.8em; color:#666; font-weight:normal;">(${h.edad})</span>` : '';
+                            let fechaLimpia = h.fecha_ingreso ? h.fecha_ingreso.split(" ")[0] : "";
+
+                            html += `<h3 style="margin:2px 0; font-size:18px;">${h.nombre} ${divEdad}</h3>
+                                     <p style="margin:0; font-size: 0.85em; font-weight: bold; color: ${colorBase};">${h.medico || 'Sin médico'}</p>
+                                     <small style="color: #555;">Ingreso: ${fechaLimpia}</small>
+                                     <div style="display:flex; gap:5px;">
+                                     <button class="btn btn-action" style="font-size:0.8em;" onclick="abrirExpediente(${h.paciente_id}, '${h.numero}')">💊 Ver/Editar</button>`;
+                            
+                            // RESTRICCIÓN DE FARMACIA
+                            if(rolActual !== 'farmacia') {
+                                html += `<button class="btn" style="font-size:0.8em; color: #e74c3c;" onclick="prepararAlta('${h.numero}', ${h.paciente_id})">🏠 Alta</button>`;
+                            }
+                            html += `</div>`;
+                        }
+                        grid.innerHTML += html + `</div>`;
+                    });
+                }
+            } catch(e) { } // Silencioso si no hay internet al recargar
+        }
+
+        async function crearHabitacion() {
+            const nom = document.getElementById('new-hab-nom').value, tipo = document.getElementById('new-hab-tipo').value;
+            if(!nom) return;
+            await peticionSegura('/agregar-habitacion', {numero: nom, tipo: tipo});
+            cerrarModal('modal-gestion-hab'); cargarHabitaciones(); document.getElementById('new-hab-nom').value="";
+        }
+
+        async function eliminarHabitacion(numero) {
+            if(confirm(`¿Eliminar ${numero}?`)) { await peticionSegura(`/eliminar-habitacion/${numero}`, {}); cargarHabitaciones(); }
+        }
+
+        async function cargarCatalogo() {
+            try {
+                const res = await fetch(`${API}/catalogo-medicamentos`); const lista = await res.json();
+                const datalist = document.getElementById('lista-medicamentos'); datalist.innerHTML = "";
+                lista.forEach(med => { datalist.innerHTML += `<option value="${med}">`; });
+            } catch(e) { }
+        }
+
+        function prepararIngreso(num) { habActiva = num; document.getElementById('lbl-hab').innerText = num; abrirModal('modal-ingreso'); }
+        
+        async function guardarPaciente() {
+            const nom = document.getElementById('nuevo-paciente').value;
+            const edd = document.getElementById('nueva-edad').value;
+            const med = document.getElementById('nuevo-medico').value;
+            let fec = document.getElementById('nueva-fecha').value;
+            
+            if(!nom || !med || !edd) return alert("Ingresa el Nombre, la Edad y el Médico tratante.");
+            if(fec) fec = fec.replace("T", " ") + ":00"; // Da formato de BD
+            
+            let exito = await peticionSegura('/ocupar-habitacion', {numero_hab: habActiva, nombre_paciente: nom, edad: edd, medico: med, fecha_ingreso: fec});
+            
+            document.getElementById('nuevo-paciente').value = ""; document.getElementById('nueva-edad').value = ""; document.getElementById('nuevo-medico').value = ""; document.getElementById('nueva-fecha').value = "";
+            cerrarModal('modal-ingreso'); 
+            if(exito) cargarHabitaciones(); else alert("Guardado sin internet. Se subirá automáticamente al recuperar conexión.");
+        }
+
+        async function abrirExpediente(pid, numHab) {
+            pacActivoId = pid; habActiva = numHab;
+            try {
+                const res = await fetch(`${API}/historial-paciente/${pid}`); const data = await res.json();
+                
+                document.getElementById('exp-nombre').innerHTML = `${data.paciente.nombre} <button class="btn-edit-small no-print" style="margin-left:10px;" onclick="abrirModalEditarPaciente(${pid}, '${data.paciente.nombre}', '${data.paciente.edad || ''}', '${data.paciente.medico || ''}', '${data.paciente.ingreso}')">✏️ Editar</button>`;
+                document.getElementById('exp-edad').innerText = data.paciente.edad ? `(${data.paciente.edad})` : '';
+                document.getElementById('exp-medico').innerText = data.paciente.medico || '';
+                document.getElementById('exp-fecha').innerText = data.paciente.ingreso;
+                document.getElementById('exp-egreso').innerText = new Date().toLocaleDateString();
+                document.getElementById('zona-farmacia').style.display = (rolActual === 'recepcion') ? 'none' : 'flex';
+                
+                const tbody = document.getElementById('tabla-meds'); tbody.innerHTML = "";
+                data.medicamentos.forEach(m => {
+                    let row = `<tr>`;
+                    row += `<td>${m.cant}</td><td>${m.nom}</td><td>${m.pres}</td>`;
+                    
+                    if(rolActual === 'administrador') {
+                        let editAudit = m.auth ? `<br><b style="color:#d35400; font-size:0.9em;">Auth. por: ${m.auth}</b>` : "";
+                        row += `<td class="solo-admin" style="font-size:0.8em; color:#666;">Por: ${m.usr}${editAudit}</td>`;
+                    } else { row += `<td class="solo-admin" style="display:none;"></td>`; }
+                    
+                    row += `<td>$${m.pb}</td><td>$${m.pf}</td><td><strong>$${m.tot}</strong></td>`;
+                    
+                    if(rolActual !== 'recepcion') {
+                        row += `<td class="no-print" style="text-align: right; width: 60px;">
+                                    <button class="btn-edit-small" onclick="prepararEdicion(${m.id}, '${m.nom}', ${m.cant}, ${m.pb})">✏️ Edit</button>
+                                </td>`;
+                    } else { row += `<td class="no-print"></td>`; }
+
+                    row += `</tr>`;
+                    tbody.innerHTML += row;
+                });
+                
+                document.querySelectorAll('.solo-admin').forEach(el => el.style.display = (rolActual === 'administrador') ? 'table-cell' : 'none');
+                document.getElementById('exp-total').innerText = data.gran_total.toFixed(2);
+                abrirModal('modal-expediente');
+            } catch(e) {
+                alert("Necesitas conexión a internet para cargar el expediente completo.");
+            }
+        }
+
+        async function agregarMed() {
+            const nom = document.getElementById('med-nom').value, pres = document.getElementById('med-pres').value, cant = document.getElementById('med-cant').value, pb = document.getElementById('med-precio').value;
+            if(!nom || !cant || !pb) return;
+            
+            let exito = await peticionSegura('/agregar-medicamento', {paciente_id: pacActivoId, nombre_med: nom, presentacion: pres, cantidad: parseFloat(cant), precio_base: parseFloat(pb), registrado_por: usrActual});
+            document.getElementById('med-nom').value = ""; document.getElementById('med-cant').value = ""; document.getElementById('med-precio').value = "";
+            
+            if(exito) { cargarCatalogo(); abrirExpediente(pacActivoId, habActiva); }
+        }
+
+        function prepararEdicion(id, nombre, cant_actual, precio_actual) {
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-nom').innerText = nombre;
+            document.getElementById('edit-cant').value = cant_actual;
+            document.getElementById('edit-precio').value = precio_actual;
+            document.getElementById('edit-pin').value = "";
+            abrirModal('modal-edicion');
+        }
+
+        async function guardarEdicion() {
+            const id = document.getElementById('edit-id').value, cant = document.getElementById('edit-cant').value, prec = document.getElementById('edit-precio').value, pin = document.getElementById('edit-pin').value;
+            if(!pin) return alert("Debes ingresar el NIP de autorización.");
+            try {
+                const res = await fetch(`${API}/editar-medicamento`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id_consumo: parseInt(id), nueva_cantidad: parseFloat(cant), nuevo_precio: parseFloat(prec), pin_autorizacion: pin })
+                });
+                if(res.ok) { cerrarModal('modal-edicion'); abrirExpediente(pacActivoId, habActiva); } 
+                else { alert("❌ NIP Incorrecto. Autorización denegada."); }
+            } catch(e) { alert("Error de red. Modificar NIPs requiere conexión activa por seguridad."); }
+        }
+
+        function prepararAlta(num, pid) { habActiva = num; pacActivoId = pid; abrirModal('modal-alta'); }
+        async function imprimirYAlta() { await abrirExpediente(pacActivoId, habActiva); window.print(); setTimeout(() => { soloAlta(); }, 1000); }
+        async function soloAlta() { 
+            let exito = await peticionSegura(`/liberar-habitacion/${habActiva}`, {}); 
+            cerrarModal('modal-alta'); cerrarModal('modal-expediente'); 
+            if(exito) cargarHabitaciones(); 
+        }
+
+        async function cambiarPassword() {
+            const u = document.getElementById('sel-usr').value, p = document.getElementById('new-pass').value;
+            if(!p) return alert("Escribe la clave");
+            await fetch(`${API}/cambiar-password`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({usuario_a_cambiar: u, nueva_password: p}) });
+            alert("Contraseña actualizada"); document.getElementById('new-pass').value = "";
+        }
+
+        async function cambiarPinMaestro() {
+            const pin = document.getElementById('new-pin-maestro').value;
+            if(!pin) return alert("Escribe un NIP");
+            await fetch(`${API}/cambiar-pin`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({nuevo_pin: pin}) });
+            alert("NIP de Autorización actualizado con éxito"); document.getElementById('new-pin-maestro').value = "";
+        }
+
+        function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function abrirModalEditarPaciente(id, nombre, edad, medico, ingreso) {
+            document.getElementById('edit-pac-id').value = id;
+            document.getElementById('edit-pac-nom').value = nombre;
+            document.getElementById('edit-pac-edad').value = edad;
+            document.getElementById('edit-pac-medico').value = medico;
+            if(ingreso) { document.getElementById('edit-pac-fecha').value = ingreso.substring(0, 16).replace(" ", "T"); }
+            abrirModal('modal-edit-paciente');
+        }
+
+        async function guardarEdicionPaciente() {
+            const id = document.getElementById('edit-pac-id').value;
+            const nom = document.getElementById('edit-pac-nom').value;
+            const edd = document.getElementById('edit-pac-edad').value;
+            const med = document.getElementById('edit-pac-medico').value;
+            let fec = document.getElementById('edit-pac-fecha').value;
+            
+            if(!nom) return alert("El nombre no puede estar vacío");
+            if(fec) fec = fec.replace("T", " ") + ":00";
+
+            let exito = await peticionSegura('/editar-paciente', {id_paciente: parseInt(id), nombre: nom, edad: edd, medico: med, fecha_ingreso: fec});
+            if(exito) {
+                cerrarModal('modal-edit-paciente');
+                cargarHabitaciones();
+                abrirExpediente(pacActivoId, habActiva);
+            }
+        }
+
+        // --- SINCRONIZADOR INVISIBLE EN TIEMPO REAL ---
+        setInterval(() => {
+            intentarSincronizar();
+            const modales = ['modal-gestion-hab', 'modal-estadisticas', 'modal-ingreso', 'modal-expediente', 'modal-edicion', 'modal-alta', 'modal-admin', 'modal-edit-paciente'];
+            let algunModalAbierto = modales.some(id => document.getElementById(id).style.display === 'flex');
+            
+            if(!algunModalAbierto && document.getElementById('pantalla-principal').style.display === 'block' && colaOffline.length === 0) {
+                cargarHabitaciones();
+            }
+        }, 4000);
+
+    </script>
+</body>
+</html>
