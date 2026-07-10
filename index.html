@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Centro Médico Fatima</title>
+    <title>Centro Médico Fatima (PRUEBAS)</title>
     <style>
         :root {
             --bg-color: #e0eaf5; --glass-bg: rgba(255, 255, 255, 0.45);
@@ -34,6 +34,7 @@
         .btn-action { background: #008B8B; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
         .btn-stats { background: #8e44ad; color: white; margin-right: 5px; width: auto; }
+        .btn-folio { background: #d35400; color: white; }
         .btn-edit-small { cursor: pointer; background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7; font-size: 11px; padding: 5px 10px; border-radius: 6px; font-weight: bold; transition: 0.2s; }
         .btn-edit-small:hover { background: #f39c12; color: white; border-color: #f39c12; }
 
@@ -45,23 +46,36 @@
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         .caja-est { background: #f0f5fa; padding: 20px; border-radius: 15px; text-align: center; margin: 10px; flex: 1; box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light); }
         
+        .membrete { display: flex; align-items: center; border-bottom: 3px solid #008B8B; padding-bottom: 15px; margin-bottom: 20px; }
+        .membrete img { width: 140px; margin-right: 20px; object-fit: contain; }
+
+        /* ESTILOS ESPECIALES PARA EL FOLIO E IMPRESION */
+        .input-clean { padding: 5px; margin: 0; box-shadow: none; border-bottom: 1px dashed #ccc; border-radius: 0; background: transparent; }
+        
         @media print {
             @page { margin: 1cm; }
             body { background: white; margin: 0; padding: 0; }
             body * { visibility: hidden; }
+            /* Se hace visible el area de impresión activa */
             #area-impresion, #area-impresion * { visibility: visible; }
-            #area-impresion { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
+            #area-impresion-folio, #area-impresion-folio * { visibility: visible; }
+            
+            #area-impresion, #area-impresion-folio { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; }
             .no-print { display: none !important; }
             .glass-3d { box-shadow: none !important; border: none !important; background: white !important; padding: 0 !important; }
-            table { font-size: 10px !important; margin-top: 5px !important; }
-            th, td { padding: 3px !important; }
+            table { font-size: 12px !important; margin-top: 5px !important; }
+            th, td { padding: 5px !important; }
             h2, h3, p { margin: 2px 0 !important; }
             .membrete { border-bottom: 2px solid #008B8B; padding-bottom: 5px; margin-bottom: 10px; }
             .membrete img { width: 90px !important; margin-right: 15px; }
-            .info-paciente { font-size: 11px; padding: 5px !important; background: none !important; border-bottom: 1px solid #eee; }
+            .info-paciente { font-size: 12px; padding: 10px !important; background: none !important; border: 1px solid #eee; }
+            
+            /* Formateo de Inputs en impresion para que parezcan texto normal */
+            input.input-clean, input.input-folio { border: none !important; background: transparent !important; color: black !important; padding: 0 !important; margin: 0 !important; outline: none !important; }
+            
+            /* Ocultar filas del folio que están en ceros */
+            .no-print-if-empty { display: none !important; }
         }
-        .membrete { display: flex; align-items: center; border-bottom: 3px solid #008B8B; padding-bottom: 15px; margin-bottom: 20px; }
-        .membrete img { width: 140px; margin-right: 20px; object-fit: contain; }
     </style>
 </head>
 <body>
@@ -73,7 +87,7 @@
         <div class="glass-3d" style="width: 350px; text-align: center;">
             <img id="logo-login" src="" alt="Centro Médico Fatima" style="width: 150px; margin-bottom: 15px;">
             <h2 style="color: #008B8B; margin:0; font-size:24px;">Centro Médico Fatima</h2>
-            <p style="margin-top:0; color:#555; font-size:14px;">Control hospitalario</p>
+            <p style="margin-top:0; color:#555; font-size:14px;">Entorno de Pruebas</p>
             <input type="text" id="log-usr" placeholder="Usuario">
             <input type="password" id="log-pass" placeholder="Contraseña">
             <button class="btn btn-action" onclick="iniciarSesion()">Ingresar</button>
@@ -86,7 +100,7 @@
                 <img id="logo-header" style="height: 55px; margin-right: 15px;" src="" alt="Logo">
                 <div>
                     <h2 style="margin:0; color: #008B8B; font-size:24px;">Centro Médico Fatima</h2>
-                    <p style="margin:0; color: #555; font-size:14px;">Control hospitalario</p>
+                    <p style="margin:0; color: #e74c3c; font-size:14px; font-weight: bold;">LABORATORIO DE PRUEBAS</p>
                 </div>
             </div>
             <div>
@@ -189,10 +203,59 @@
                 </thead>
                 <tbody id="tabla-meds"></tbody>
             </table>
-            <h3 style="text-align: right; color: #008B8B;">Gran Total: $<span id="exp-total">0.00</span></h3>
+            <h3 style="text-align: right; color: #008B8B;">Gran Total Medicamentos: $<span id="exp-total">0.00</span></h3>
             <div class="no-print" style="margin-top: 20px; display: flex; gap: 15px;">
-                <button class="btn" onclick="window.print()">🖨️ Imprimir Hoja</button>
+                <button class="btn" onclick="window.print()">🖨️ Imprimir Farmacia</button>
                 <button class="btn" onclick="cerrarModal('modal-expediente')" style="background: #ccc;">Cerrar Vista</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-folio" class="modal-overlay">
+        <div class="glass-3d modal-content" id="area-impresion-folio">
+            <div class="membrete">
+                <img id="logo-impresion-folio" src="" alt="Centro Médico Fatima">
+                <div>
+                    <h2 style="margin: 0; color: #008B8B; font-size:22px;">Centro Médico Fatima S.A de C.V</h2>
+                    <p style="margin: 2px 0 0 0; color:#555; font-weight: bold;">ESTADO DE CUENTA / FOLIO</p>
+                </div>
+            </div>
+            
+            <div class="info-paciente" style="background: #f0f5fa; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div><strong>Paciente:</strong> <span id="fol-nombre"></span> <span id="fol-edad" style="color: #666; font-size: 0.9em;"></span></div>
+                    <div><strong>Fecha de Ingreso:</strong> <span id="fol-ingreso"></span></div>
+                    
+                    <div><strong>Médico Tratante:</strong> <span id="fol-medico" style="color: #008B8B; font-weight: bold;"></span></div>
+                    <div><strong>Fecha de Egreso:</strong> <span id="fol-egreso"></span></div>
+                    
+                    <div><strong>Habitación:</strong> <span id="fol-hab" style="font-weight: bold;"></span></div>
+                    <div style="display: flex; align-items: center;"><strong>DX. Ingreso:</strong> <input type="text" class="input-clean" style="flex:1; margin-left: 5px; margin-bottom:0;" placeholder="Escribe el diagnóstico aquí..."></div>
+                </div>
+            </div>
+
+            <p class="no-print" style="color: #e74c3c; font-size: 12px; margin-top: -5px; text-align:center;">
+                * Llena la columna "Cant." para activar los cobros. Los rubros con Cantidad 0 se ocultarán automáticamente en la hoja al imprimir.
+            </p>
+
+            <table style="margin-top: 0;">
+                <thead>
+                    <tr style="background: #008B8B; color: white;">
+                        <th>CONCEPTO</th>
+                        <th style="width: 100px;">COSTO $</th>
+                        <th style="width: 70px;">CANT.</th>
+                        <th style="width: 120px;">SUBTOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-folio">
+                    </tbody>
+            </table>
+            
+            <h2 style="text-align: right; color: #008B8B; margin-top: 15px; font-size: 26px;">GRAN TOTAL: $<span id="folio-gran-total">0.00</span></h2>
+            
+            <div class="no-print" style="margin-top: 20px; display: flex; gap: 15px;">
+                <button class="btn btn-folio" onclick="window.print()">🖨️ Imprimir Estado de Cuenta</button>
+                <button class="btn" onclick="cerrarModal('modal-folio')" style="background: #ccc;">Cerrar</button>
             </div>
         </div>
     </div>
@@ -217,9 +280,8 @@
     <div id="modal-alta" class="modal-overlay">
         <div class="glass-3d modal-content" style="max-width: 400px; text-align: center;">
             <h3 style="color: #e74c3c;">Dar de Alta</h3>
-            <p>¿Deseas imprimir el reporte antes de liberar el área?</p>
-            <button class="btn btn-action" onclick="imprimirYAlta()">Imprimir y Dar de Alta</button>
-            <button class="btn" onclick="soloAlta()">Solo Dar de Alta</button>
+            <p>Al liberar el área la habitación quedará libre y disponible para un nuevo ingreso.</p>
+            <button class="btn btn-action" onclick="soloAlta()">Dar de Alta (Liberar)</button>
             <button class="btn" onclick="cerrarModal('modal-alta')">Cancelar</button>
         </div>
     </div>
@@ -266,8 +328,31 @@
         const COLORES = { "Habitación": "#2980b9", "Urgencias": "#e74c3c", "Incubadora": "#f1c40f", "Suite": "#27ae60", "Consultorio": "#e67e22" };
         const TITULOS = { "Habitación": "🛏️ Habitaciones Hospitalarias", "Urgencias": "🚨 Valoración y Urgencias", "Incubadora": "🐣 Incubadoras", "Suite": "🌟 Suites", "Consultorio": "🩺 Consultorios" };
 
+        // CONCEPTOS PARA EL FOLIO GENERAL (Basado en PDFs)
+        const CONCEPTOS_FOLIO = [
+            { id: 'estancia', nombre: 'Día de Estancia', costo: 920.00 },
+            { id: 'estancia_urg', nombre: 'Estancia 6 Horas (Valoración)', costo: 440.00 },
+            { id: 'estancia_suite', nombre: 'Día de Estancia Suite', costo: 1100.00 },
+            { id: 'incubadora', nombre: 'Cuarto con Incubadora', costo: 650.00 },
+            { id: 'hora_extra', nombre: 'Hora Adicional de Estancia', costo: 50.00 },
+            { id: 'quirofano', nombre: 'Quirófano (2 Horas)', costo: 750.00 },
+            { id: 'quirofano_extra', nombre: 'Hora Adicional Quirófano', costo: 300.00 },
+            { id: 'toco', nombre: 'Tocoquirugía', costo: 600.00 },
+            { id: 'bloqueo', nombre: 'Equipo de Bloqueo', costo: 100.00 },
+            { id: 'blancos', nombre: 'Blancos', costo: 250.00 },
+            { id: 'oxigeno', nombre: 'Oxígeno (Hora)', costo: 130.00 },
+            { id: 'alimentos', nombre: 'Alimentos', costo: 85.00 },
+            { id: 'venoclisis', nombre: 'Venoclisis', costo: 50.00 },
+            { id: 'antisepticos', nombre: 'Antisépticos', costo: 60.00 },
+            { id: 'circulantes', nombre: 'Circulantes', costo: 60.00 },
+            { id: 'desechable', nombre: 'Desechable', costo: 50.00 },
+            { id: 'electrocauterio', nombre: 'Electrocauterio', costo: 660.00 },
+            { id: 'cx_menor', nombre: 'Reducciones T / CX Menor', costo: 250.00 }
+        ];
+
         document.getElementById('logo-header').src = `${API}/logo`;
         document.getElementById('logo-impresion').src = `${API}/logo`;
+        document.getElementById('logo-impresion-folio').src = `${API}/logo`;
         document.getElementById('logo-login').src = `${API}/logo`;
 
         function capitalizarPrimeraLetra(input) { if(input.value.length > 0) input.value = input.value.charAt(0).toUpperCase() + input.value.slice(1); }
@@ -318,9 +403,6 @@
 
             if(exitoTotal && tempCola.length > 0) {
                 cargarHabitaciones();
-                if(document.getElementById('modal-expediente').style.display === 'flex') {
-                    abrirExpediente(pacActivoId, habActiva); 
-                }
             }
         }
         actualizarUIOffline();
@@ -396,12 +478,15 @@
                             html += `<h3 style="margin:2px 0; font-size:18px;">${h.nombre} ${divEdad}</h3>
                                      <p style="margin:0; font-size: 0.85em; font-weight: bold; color: ${colorBase};">${h.medico || 'Sin médico'}</p>
                                      <small style="color: #555;">Ingreso: ${fechaLimpia}</small>
-                                     <div style="display:flex; gap:5px;">
-                                     <button class="btn btn-action" style="font-size:0.8em;" onclick="abrirExpediente(${h.paciente_id}, '${h.numero}')">💊 Ver/Editar</button>`;
+                                     <div style="display:flex; gap:5px; flex-wrap:wrap;">`;
+                                     
+                            // BOTON FARMACIA
+                            html += `<button class="btn btn-action" style="font-size:0.8em; flex:1;" onclick="abrirExpediente(${h.paciente_id}, '${h.numero}')">💊 Medicinas</button>`;
                             
-                            // RESTRICCIÓN DE FARMACIA
+                            // RESTRICCIÓN DE FARMACIA (Boton Folio y Alta)
                             if(rolActual !== 'farmacia') {
-                                html += `<button class="btn" style="font-size:0.8em; color: #e74c3c;" onclick="prepararAlta('${h.numero}', ${h.paciente_id})">🏠 Alta</button>`;
+                                html += `<button class="btn btn-folio" style="font-size:0.8em; flex:1;" onclick="abrirFolio(${h.paciente_id}, '${h.numero}', '${h.tipo}')">📄 Folio</button>`;
+                                html += `<button class="btn" style="font-size:0.8em; color: #e74c3c; width:100%;" onclick="prepararAlta('${h.numero}', ${h.paciente_id})">🏠 Dar de Alta</button>`;
                             }
                             html += `</div>`;
                         }
@@ -448,6 +533,9 @@
             if(exito) cargarHabitaciones(); else alert("Guardado sin internet. Se subirá automáticamente al recuperar conexión.");
         }
 
+        // ==========================================
+        // LOGICA DE FARMACIA Y MEDICAMENTOS
+        // ==========================================
         async function abrirExpediente(pid, numHab) {
             pacActivoId = pid; habActiva = numHab;
             try {
@@ -486,7 +574,7 @@
                 document.getElementById('exp-total').innerText = data.gran_total.toFixed(2);
                 abrirModal('modal-expediente');
             } catch(e) {
-                alert("Necesitas conexión a internet para cargar el expediente completo.");
+                alert("Necesitas conexión a internet para cargar el expediente.");
             }
         }
 
@@ -496,7 +584,6 @@
             
             let exito = await peticionSegura('/agregar-medicamento', {paciente_id: pacActivoId, nombre_med: nom, presentacion: pres, cantidad: parseFloat(cant), precio_base: parseFloat(pb), registrado_por: usrActual});
             document.getElementById('med-nom').value = ""; document.getElementById('med-cant').value = ""; document.getElementById('med-precio').value = "";
-            
             if(exito) { cargarCatalogo(); abrirExpediente(pacActivoId, habActiva); }
         }
 
@@ -519,14 +606,112 @@
                 });
                 if(res.ok) { cerrarModal('modal-edicion'); abrirExpediente(pacActivoId, habActiva); } 
                 else { alert("❌ NIP Incorrecto. Autorización denegada."); }
-            } catch(e) { alert("Error de red. Modificar NIPs requiere conexión activa por seguridad."); }
+            } catch(e) { alert("Error de red."); }
         }
 
+        // ==========================================
+        // NUEVA LOGICA: FOLIO / ESTADO DE CUENTA
+        // ==========================================
+        async function abrirFolio(pid, numHab, tipoHab) {
+            try {
+                const res = await fetch(`${API}/historial-paciente/${pid}`); const data = await res.json();
+                
+                // 1. Llenar cabecera
+                document.getElementById('fol-nombre').innerText = data.paciente.nombre;
+                document.getElementById('fol-edad').innerText = data.paciente.edad ? `(${data.paciente.edad})` : '';
+                document.getElementById('fol-medico').innerText = data.paciente.medico || '';
+                document.getElementById('fol-ingreso').innerText = data.paciente.ingreso;
+                
+                let fechaHoy = new Date();
+                let opcionesFecha = { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+                document.getElementById('fol-egreso').innerText = fechaHoy.toLocaleDateString('es-MX', opcionesFecha);
+                document.getElementById('fol-hab').innerText = numHab;
+                
+                // 2. Calculo Automatico de Dias (La magia)
+                let fechaIngresoFormat = data.paciente.ingreso.replace(/-/g, '/'); // Fix iOS parsing
+                let fechaIngreso = new Date(fechaIngresoFormat);
+                let horasEstancia = Math.abs(fechaHoy - fechaIngreso) / 36e5; // Diferencia en horas
+                
+                let cantEstancia = 0, cantUrgencias = 0, cantIncubadora = 0;
+                
+                if (tipoHab === 'Urgencias') {
+                    cantUrgencias = 1; // Por defecto cobramos 6 hrs
+                } else if (tipoHab === 'Incubadora') {
+                    cantIncubadora = Math.max(1, Math.floor(horasEstancia / 24));
+                } else {
+                    cantEstancia = Math.max(1, Math.floor(horasEstancia / 24));
+                    if (horasEstancia % 24 >= 6) cantEstancia++; // Regla: Si pasa de 6 hrs extra, es otro dia
+                }
+
+                // 3. Renderizar Tabla
+                window.folioFarmaciaTotal = data.gran_total; // Guardamos variable global temporal
+                const tbody = document.getElementById('tbody-folio');
+                tbody.innerHTML = '';
+                
+                // Fila fija e intocable de farmacia
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>FARMACIA / CARRO ROJO (Medicamentos)</strong></td>
+                        <td>$${data.gran_total.toFixed(2)}</td>
+                        <td>1</td>
+                        <td><strong>$${data.gran_total.toFixed(2)}</strong></td>
+                    </tr>
+                `;
+                
+                // Filas de conceptos
+                CONCEPTOS_FOLIO.forEach(c => {
+                    tbody.innerHTML += `
+                        <tr id="row-fol-${c.id}" class="no-print-if-empty">
+                            <td>${c.nombre}</td>
+                            <td><input type="number" id="costo-${c.id}" value="${c.costo}" class="input-folio input-clean" onchange="calcularFolio()"></td>
+                            <td><input type="number" id="cant-${c.id}" value="0" min="0" class="input-folio input-clean" style="width: 50px;" onchange="calcularFolio()"></td>
+                            <td>$<span id="sub-${c.id}">0.00</span></td>
+                        </tr>
+                    `;
+                });
+
+                // Llenamos las cantidades autocalculadas
+                if(cantEstancia > 0 && document.getElementById('cant-estancia')) document.getElementById('cant-estancia').value = cantEstancia;
+                if(cantUrgencias > 0 && document.getElementById('cant-estancia_urg')) document.getElementById('cant-estancia_urg').value = cantUrgencias;
+                if(cantIncubadora > 0 && document.getElementById('cant-incubadora')) document.getElementById('cant-incubadora').value = cantIncubadora;
+
+                calcularFolio(); // Hacemos las sumas
+                abrirModal('modal-folio');
+            } catch(e) {
+                alert("Necesitas conexión a internet para cargar el folio completo.");
+            }
+        }
+
+        function calcularFolio() {
+            let totalFolio = window.folioFarmaciaTotal || 0;
+            
+            CONCEPTOS_FOLIO.forEach(c => {
+                let costo = parseFloat(document.getElementById(`costo-${c.id}`).value) || 0;
+                let cant = parseFloat(document.getElementById(`cant-${c.id}`).value) || 0;
+                let sub = costo * cant;
+                
+                document.getElementById(`sub-${c.id}`).innerText = sub.toFixed(2);
+                totalFolio += sub;
+                
+                // Lógica para que CSS sepa si debe ocultarlo en impresión (Cant = 0)
+                let row = document.getElementById(`row-fol-${c.id}`);
+                if(cant > 0) {
+                    row.classList.remove('no-print-if-empty');
+                } else {
+                    row.classList.add('no-print-if-empty');
+                }
+            });
+            
+            document.getElementById('folio-gran-total').innerText = totalFolio.toFixed(2);
+        }
+
+        // ==========================================
+        // ALTA Y ADMINISTRACION
+        // ==========================================
         function prepararAlta(num, pid) { habActiva = num; pacActivoId = pid; abrirModal('modal-alta'); }
-        async function imprimirYAlta() { await abrirExpediente(pacActivoId, habActiva); window.print(); setTimeout(() => { soloAlta(); }, 1000); }
         async function soloAlta() { 
             let exito = await peticionSegura(`/liberar-habitacion/${habActiva}`, {}); 
-            cerrarModal('modal-alta'); cerrarModal('modal-expediente'); 
+            cerrarModal('modal-alta'); 
             if(exito) cargarHabitaciones(); 
         }
 
@@ -577,7 +762,7 @@
         // --- SINCRONIZADOR INVISIBLE EN TIEMPO REAL ---
         setInterval(() => {
             intentarSincronizar();
-            const modales = ['modal-gestion-hab', 'modal-estadisticas', 'modal-ingreso', 'modal-expediente', 'modal-edicion', 'modal-alta', 'modal-admin', 'modal-edit-paciente'];
+            const modales = ['modal-gestion-hab', 'modal-estadisticas', 'modal-ingreso', 'modal-expediente', 'modal-edicion', 'modal-alta', 'modal-admin', 'modal-edit-paciente', 'modal-folio'];
             let algunModalAbierto = modales.some(id => document.getElementById(id).style.display === 'flex');
             
             if(!algunModalAbierto && document.getElementById('pantalla-principal').style.display === 'block' && colaOffline.length === 0) {
