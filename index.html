@@ -115,6 +115,7 @@
         <div class="grid-hab" id="grid-habitaciones"></div>
     </div>
 
+    <!-- MODALES DE CONFIGURACIÓN Y ESTADÍSTICAS -->
     <div id="modal-gestion-hab" class="modal-overlay">
         <div class="glass-3d modal-content" style="max-width: 400px;">
             <h3 style="color: #008B8B;">⚙️ Administrar Áreas</h3>
@@ -174,6 +175,7 @@
         </div>
     </div>
 
+    <!-- EXPEDIENTE FARMACIA -->
     <div id="modal-expediente" class="modal-overlay">
         <div class="glass-3d modal-content" id="area-impresion">
             <div class="membrete">
@@ -211,6 +213,7 @@
         </div>
     </div>
 
+    <!-- NUEVO MODAL: ESTADO DE CUENTA / FOLIO GENERAL -->
     <div id="modal-folio" class="modal-overlay">
         <div class="glass-3d modal-content" id="area-impresion-folio">
             <div class="membrete">
@@ -248,7 +251,8 @@
                     </tr>
                 </thead>
                 <tbody id="tbody-folio">
-                    </tbody>
+                    <!-- Filas autogeneradas por JS -->
+                </tbody>
             </table>
             
             <h2 style="text-align: right; color: #008B8B; margin-top: 15px; font-size: 26px;">GRAN TOTAL: $<span id="folio-gran-total">0.00</span></h2>
@@ -260,6 +264,7 @@
         </div>
     </div>
 
+    <!-- MODALES DE EDICION Y ALTA -->
     <div id="modal-edicion" class="modal-overlay">
         <div class="glass-3d modal-content" style="max-width: 400px;">
             <h3 style="color: #008B8B;">Modificar Registro</h3>
@@ -627,20 +632,42 @@
                 document.getElementById('fol-egreso').innerText = fechaHoy.toLocaleDateString('es-MX', opcionesFecha);
                 document.getElementById('fol-hab').innerText = numHab;
                 
-                // 2. Calculo Automatico de Dias (La magia)
+                // 2. Calculo Automatico de Dias y Extras
                 let fechaIngresoFormat = data.paciente.ingreso.replace(/-/g, '/'); // Fix iOS parsing
                 let fechaIngreso = new Date(fechaIngresoFormat);
                 let horasEstancia = Math.abs(fechaHoy - fechaIngreso) / 36e5; // Diferencia en horas
                 
-                let cantEstancia = 0, cantUrgencias = 0, cantIncubadora = 0;
+                let cantEstancia = 0, cantEstanciaSuite = 0, cantUrgencias = 0, cantIncubadora = 0, cantBlancos = 0, cantHoraExtra = 0;
                 
+                // Regla de Negocio 1: Las habitaciones 7 y 8 se consideran Suite siempre
+                let esSuite = (tipoHab === 'Suite' || numHab === '7' || numHab === '8');
+
                 if (tipoHab === 'Urgencias') {
-                    cantUrgencias = 1; // Por defecto cobramos 6 hrs
+                    cantUrgencias = 1; // Por defecto cobramos 6 hrs iniciales
+                    cantBlancos = 1; // 1 set de blancos inicial
+                    
+                    // Regla de Negocio 3: Si pasan más de 6 hrs en Urgencias, cobra horas extra
+                    if (horasEstancia > 6) {
+                        cantHoraExtra = Math.floor(horasEstancia - 6);
+                    }
                 } else if (tipoHab === 'Incubadora') {
                     cantIncubadora = Math.max(1, Math.floor(horasEstancia / 24));
+                    if (horasEstancia % 24 >= 6) cantIncubadora++;
+                    
+                    // Regla de Negocio 2: Cobro de blancos por cada día de internamiento
+                    cantBlancos = cantIncubadora; 
+                } else if (esSuite) {
+                    cantEstanciaSuite = Math.max(1, Math.floor(horasEstancia / 24));
+                    if (horasEstancia % 24 >= 6) cantEstanciaSuite++;
+                    
+                    // Regla de Negocio 2: Cobro de blancos por cada día de internamiento
+                    cantBlancos = cantEstanciaSuite;
                 } else {
                     cantEstancia = Math.max(1, Math.floor(horasEstancia / 24));
                     if (horasEstancia % 24 >= 6) cantEstancia++; // Regla: Si pasa de 6 hrs extra, es otro dia
+                    
+                    // Regla de Negocio 2: Cobro de blancos por cada día de internamiento
+                    cantBlancos = cantEstancia;
                 }
 
                 // 3. Renderizar Tabla
@@ -670,10 +697,13 @@
                     `;
                 });
 
-                // Llenamos las cantidades autocalculadas
+                // Llenamos las cantidades autocalculadas en el HTML
                 if(cantEstancia > 0 && document.getElementById('cant-estancia')) document.getElementById('cant-estancia').value = cantEstancia;
+                if(cantEstanciaSuite > 0 && document.getElementById('cant-estancia_suite')) document.getElementById('cant-estancia_suite').value = cantEstanciaSuite;
                 if(cantUrgencias > 0 && document.getElementById('cant-estancia_urg')) document.getElementById('cant-estancia_urg').value = cantUrgencias;
                 if(cantIncubadora > 0 && document.getElementById('cant-incubadora')) document.getElementById('cant-incubadora').value = cantIncubadora;
+                if(cantHoraExtra > 0 && document.getElementById('cant-hora_extra')) document.getElementById('cant-hora_extra').value = cantHoraExtra;
+                if(cantBlancos > 0 && document.getElementById('cant-blancos')) document.getElementById('cant-blancos').value = cantBlancos;
 
                 calcularFolio(); // Hacemos las sumas
                 abrirModal('modal-folio');
