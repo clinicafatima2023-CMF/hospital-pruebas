@@ -19,39 +19,47 @@ def get_db(): return libsql_client.create_client(url=url, auth_token=token)
 
 def init_db():
     db = get_db()
-    # Tabla de Usuarios Reales
+    # Tablas
     db.execute("CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, rol TEXT)")
-    
-    # Crear usuario admin por defecto si no existe
-    res = db.execute("SELECT * FROM usuarios WHERE username = 'admin'")
-    if not res.rows:
-        hash_pw = pwd_context.hash("1234")
-        db.execute(f"INSERT INTO usuarios (username, password, rol) VALUES ('admin', '{hash_pw}', 'administrador')")
-
-    # Tablas existentes
     db.execute("CREATE TABLE IF NOT EXISTS pin_maestro (id INTEGER PRIMARY KEY, pin TEXT)")
-    res_pin = db.execute("SELECT * FROM pin_maestro")
-    if not res_pin.rows: db.execute("INSERT INTO pin_maestro (pin) VALUES ('1234')")
-
     db.execute("CREATE TABLE IF NOT EXISTS pacientes (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, edad TEXT, medico TEXT, habitacion TEXT, fecha_ingreso TEXT, estado TEXT)")
     db.execute("CREATE TABLE IF NOT EXISTS consumos (id INTEGER PRIMARY KEY AUTOINCREMENT, paciente_id INTEGER, nombre_med TEXT, presentacion TEXT, cantidad REAL, precio_base REAL, registrado_por TEXT, fecha TEXT, autorizado_por TEXT)")
     db.execute("CREATE TABLE IF NOT EXISTS catalogo_meds (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE)")
     db.execute("CREATE TABLE IF NOT EXISTS habitaciones (numero TEXT PRIMARY KEY, tipo TEXT)")
-    
-    # NUEVA TABLA: FOLIOS
     db.execute("CREATE TABLE IF NOT EXISTS folios (id INTEGER PRIMARY KEY AUTOINCREMENT, paciente_id INTEGER, habitacion TEXT, total REAL, estado TEXT, emitido_por TEXT, fecha TEXT, cancelado_por TEXT)")
-    
-    # Habitaciones por defecto
-    res_habs = db.execute("SELECT * FROM habitaciones")
-    if not res_habs.rows:
-        habs = [('1','Habitación'),('2','Habitación'),('3','Habitación'),('4','Habitación'),('5','Habitación'),('6','Habitación'),('7','Suite'),('8','Suite'),('Urgencias 1','Urgencias'),('Urgencias 2','Urgencias'),('Incubadora 1','Incubadora'),('Consultorio 1','Consultorio')]
-        for h in habs: db.execute(f"INSERT INTO habitaciones (numero, tipo) VALUES ('{h[0]}', '{h[1]}')")
     db.close()
 
 init_db()
 
+@app.get("/migrar-nube")
+def migrar_nube():
+    db = get_db()
+    # Crear PIN por defecto si no existe
+    if not db.execute("SELECT * FROM pin_maestro").rows: 
+        db.execute("INSERT INTO pin_maestro (pin) VALUES ('1234')")
+    
+    # Crear usuarios base (Administrador, Recepcion, Farmacia)
+    usuarios_base = [
+        ("admin", "1234", "administrador"),
+        ("recepcion", "1234", "recepcion"),
+        ("farmacia", "1234", "farmacia")
+    ]
+    for u, p, r in usuarios_base:
+        if not db.execute(f"SELECT * FROM usuarios WHERE username = '{u}'").rows:
+            hash_pw = pwd_context.hash(p)
+            db.execute(f"INSERT INTO usuarios (username, password, rol) VALUES ('{u}', '{hash_pw}', '{r}')")
+            
+    # Habitaciones por defecto
+    if not db.execute("SELECT * FROM habitaciones").rows:
+        habs = [('1','Habitación'),('2','Habitación'),('3','Habitación'),('4','Habitación'),('5','Habitación'),('6','Habitación'),('7','Suite'),('8','Suite'),('Urgencias 1','Urgencias'),('Urgencias 2','Urgencias'),('Incubadora 1','Incubadora'),('Consultorio 1','Consultorio')]
+        for h in habs: db.execute(f"INSERT INTO habitaciones (numero, tipo) VALUES ('{h[0]}', '{h[1]}')")
+    db.close()
+    return {"status": "ok", "mensaje": "Base de datos sincronizada y lista"}
+
 class LoginData(BaseModel): usuario: str; password: str
 class NuevoUsuario(BaseModel): username: str; password: str; rol: str; pin_autorizacion: str
+class CambioPass(BaseModel): usuario_a_cambiar: str; nueva_password: str
+class CambioPin(BaseModel): nuevo_pin: str
 
 @app.post("/login")
 def login(data: LoginData):
@@ -78,8 +86,26 @@ def crear_usuario(data: NuevoUsuario):
         db.close()
         raise HTTPException(status_code=400, detail="El usuario ya existe")
 
+@app.post("/cambiar-password")
+def cambiar_password(data: CambioPass):
+    db = get_db()
+    hash_pw = pwd_context.hash(data.nueva_password)
+    db.execute(f"UPDATE usuarios SET password = '{hash_pw}' WHERE username = '{data.usuario_a_cambiar}'")
+    db.close()
+    return {"status": "ok"}
+
+@app.post("/cambiar-pin")
+def cambiar_pin(data: CambioPin):
+    db = get_db()
+    db.execute(f"UPDATE pin_maestro SET pin = '{data.nuevo_pin}' WHERE id = 1")
+    db.close()
+    return {"status": "ok"}
+
 class PacienteAlta(BaseModel): numero_hab: str; nombre_paciente: str; edad: str; medico: str; fecha_ingreso: Optional[str] = None
+class PacienteEdit(BaseModel): id_paciente: int; nombre: str; edad: str; medico: str; fecha_ingreso: str
+class HabNueva(BaseModel): numero: str; tipo: str
 class ConsumoNuevo(BaseModel): paciente_id: int; nombre_med: str; presentacion: str; cantidad: float; precio_base: float; registrado_por: str
+class ConsumoEdit(BaseModel): id_consumo: int; nueva_cantidad: float; nuevo_precio: float; pin_autorizacion: str
 
 @app.get("/habitaciones")
 def obtener_habitaciones():
@@ -99,6 +125,20 @@ def obtener_habitaciones():
             resultado.append({"numero": num, "tipo": tipo, "estado": "LIBRE"})
     return resultado
 
+@app.post("/agregar-habitacion")
+def agregar_habitacion(data: HabNueva):
+    db = get_db()
+    db.execute(f"INSERT INTO habitaciones (numero, tipo) VALUES ('{data.numero}', '{data.tipo}')")
+    db.close()
+    return {"status": "ok"}
+
+@app.post("/eliminar-habitacion/{numero}")
+def eliminar_habitacion(numero: str):
+    db = get_db()
+    db.execute(f"DELETE FROM habitaciones WHERE numero = '{numero}'")
+    db.close()
+    return {"status": "ok"}
+
 @app.post("/ocupar-habitacion")
 def ocupar_habitacion(data: PacienteAlta):
     db = get_db()
@@ -107,13 +147,18 @@ def ocupar_habitacion(data: PacienteAlta):
     db.close()
     return {"status": "ok"}
 
+@app.post("/editar-paciente")
+def editar_paciente(data: PacienteEdit):
+    db = get_db()
+    db.execute(f"UPDATE pacientes SET nombre = '{data.nombre}', edad = '{data.edad}', medico = '{data.medico}', fecha_ingreso = '{data.fecha_ingreso}' WHERE id = {data.id_paciente}")
+    db.close()
+    return {"status": "ok"}
+
 @app.get("/historial-paciente/{paciente_id}")
 def obtener_historial_paciente(paciente_id: int):
     db = get_db()
     p = db.execute(f"SELECT nombre, habitacion, fecha_ingreso, edad, medico FROM pacientes WHERE id = {paciente_id}").rows[0]
     meds = db.execute(f"SELECT id, nombre_med, presentacion, cantidad, precio_base, registrado_por, autorizado_por FROM consumos WHERE paciente_id = {paciente_id}").rows
-    
-    # Buscar folios activos de este paciente
     folios = db.execute(f"SELECT id, estado, total, emitido_por FROM folios WHERE paciente_id = {paciente_id} ORDER BY id DESC").rows
     db.close()
 
@@ -146,7 +191,17 @@ def agregar_medicamento(data: ConsumoNuevo):
     db.close()
     return {"status": "ok"}
 
-# --- NUEVOS ENDPOINTS PARA FOLIOS ---
+@app.post("/editar-medicamento")
+def editar_medicamento(data: ConsumoEdit):
+    db = get_db()
+    pin_real = db.execute("SELECT pin FROM pin_maestro WHERE id = 1").rows[0][0]
+    if data.pin_autorizacion != pin_real:
+        db.close()
+        raise HTTPException(status_code=403, detail="PIN incorrecto")
+    db.execute(f"UPDATE consumos SET cantidad = {data.nueva_cantidad}, precio_base = {data.nuevo_precio}, autorizado_por = 'Admin' WHERE id = {data.id_consumo}")
+    db.close()
+    return {"status": "ok"}
+
 class GenerarFolioData(BaseModel): paciente_id: int; habitacion: str; total: float; usuario: str
 class CancelarFolioData(BaseModel): folio_id: int; usuario: str; pin_autorizacion: str
 
@@ -155,7 +210,6 @@ def generar_folio(data: GenerarFolioData):
     db = get_db()
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db.execute(f"INSERT INTO folios (paciente_id, habitacion, total, estado, emitido_por, fecha) VALUES ({data.paciente_id}, '{data.habitacion}', {data.total}, 'ACTIVO', '{data.usuario}', '{fecha}')")
-    # Obtener el ID insertado
     res = db.execute("SELECT seq FROM sqlite_sequence WHERE name='folios'")
     folio_id = res.rows[0][0]
     db.close()
@@ -168,7 +222,6 @@ def cancelar_folio(data: CancelarFolioData):
     if data.pin_autorizacion != pin_real:
         db.close()
         raise HTTPException(status_code=403, detail="PIN incorrecto")
-    
     db.execute(f"UPDATE folios SET estado = 'CANCELADO', cancelado_por = '{data.usuario}' WHERE id = {data.folio_id}")
     db.close()
     return {"status": "ok"}
@@ -181,7 +234,32 @@ def liberar_habitacion(numero: str):
     return {"status": "ok"}
 
 @app.get("/estadisticas")
-def estadisticas(): return {"porcentaje": 0, "dias_consumidos": 0, "ingresos_anuales": 0, "historial": []}
+def estadisticas():
+    db = get_db()
+    hoy = datetime.now()
+    dias_del_ano = hoy.timetuple().tm_yday
+    camas_totales = 12
+    pacientes = db.execute("SELECT nombre, edad, medico, fecha_ingreso, estado FROM pacientes").rows
+    db.close()
+
+    dias_totales_facturados = 0
+    ingresos_totales = len(pacientes)
+    historial = []
+
+    for p in pacientes:
+        fecha_ing = datetime.strptime(p[3], "%Y-%m-%d %H:%M:%S")
+        horas_estancia = (hoy - fecha_ing).total_seconds() / 3600
+        dias_fact = max(1, int(horas_estancia // 24))
+        if horas_estancia % 24 >= 6: dias_fact += 1
+        dias_totales_facturados += dias_fact
+        
+        tiempo_str = f"{int(horas_estancia//24)}d {int(horas_estancia%24)}h"
+        historial.append({"nombre": p[0], "edad": p[1], "medico": p[2], "ingreso": p[3], "estado": p[4], "tiempo": tiempo_str, "dias_fact": dias_fact})
+
+    max_dias_posibles = camas_totales * dias_del_ano
+    porcentaje = round((dias_totales_facturados / max_dias_posibles) * 100, 1) if max_dias_posibles > 0 else 0
+
+    return {"porcentaje": porcentaje, "dias_consumidos": dias_totales_facturados, "ingresos_anuales": ingresos_totales, "historial": historial[::-1]}
 
 @app.get("/catalogo-medicamentos")
 def catalogo():
