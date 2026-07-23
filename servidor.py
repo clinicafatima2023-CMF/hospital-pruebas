@@ -15,7 +15,7 @@ url = os.getenv("TURSO_URL")
 token = os.getenv("TURSO_TOKEN")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def get_db(): return libsql_client.create_client(url=url, auth_token=token)
+def get_db(): return libsql_client.create_client_sync(url=url, auth_token=token)
 
 def init_db():
     db = get_db()
